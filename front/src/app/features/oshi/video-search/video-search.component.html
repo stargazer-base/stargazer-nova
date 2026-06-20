@@ -1,10 +1,12 @@
 <div class="flex flex-col h-full space-y-4">
+  <!-- ヘッダー -->
   <div
     class="flex items-center justify-between border-b-2 border-indigo-800 pb-2"
   >
     <h2 class="text-2xl font-bold text-indigo-100">推し出演動画横断検索</h2>
   </div>
 
+  <!-- 検索・編集モード切替 -->
   <div
     class="bg-indigo-900/30 px-4 rounded-lg border border-indigo-800 flex items-center gap-4 shadow-sm h-[72px]"
   >
@@ -106,7 +108,8 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
+  <!-- 動画リスト -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-2">
     <a
       *ngFor="let video of videos"
       [href]="video.url"
