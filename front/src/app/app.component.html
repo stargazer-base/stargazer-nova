@@ -1,0 +1,13 @@
+<div class="min-h-screen flex flex-col">
+  <app-header></app-header>
+
+  <div class="flex flex-1 overflow-hidden">
+    <app-sidebar
+      class="w-64 border-r-2 border-indigo-500 overflow-y-auto"
+    ></app-sidebar>
+
+    <main class="flex-1 p-6 overflow-y-auto">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</div>
