@@ -1,1 +1,187 @@
-<p>video-search works!</p>
+<div class="flex flex-col h-full space-y-4">
+  <div
+    class="flex items-center justify-between border-b-2 border-indigo-800 pb-2"
+  >
+    <h2 class="text-2xl font-bold text-indigo-100">推し出演動画横断検索</h2>
+  </div>
+
+  <div
+    class="bg-indigo-900/30 px-4 rounded-lg border border-indigo-800 flex items-center gap-4 shadow-sm h-[72px]"
+  >
+    <div
+      class="flex bg-blue-950 rounded-md border border-indigo-700 overflow-hidden shrink-0 h-10"
+    >
+      <button
+        (click)="toggleMode('search')"
+        [class]="
+          !isEditMode
+            ? 'bg-indigo-600 text-white'
+            : 'text-indigo-400 hover:bg-indigo-800/50'
+        "
+        class="px-3 flex items-center justify-center transition-colors"
+        title="検索モード"
+      >
+        <svg
+          class="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          ></path>
+        </svg>
+      </button>
+      <button
+        (click)="toggleMode('edit')"
+        [class]="
+          isEditMode
+            ? 'bg-indigo-600 text-white'
+            : 'text-indigo-400 hover:bg-indigo-800/50'
+        "
+        class="px-3 flex items-center justify-center transition-colors"
+        title="編集モード"
+      >
+        <svg
+          class="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+          ></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class="h-8 w-px bg-indigo-700 shrink-0"></div>
+
+    <div *ngIf="!isEditMode" class="flex-1 flex gap-3 items-center">
+      <select
+        class="h-10 bg-blue-950 border border-indigo-600 rounded-md px-3 text-blue-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      >
+        <option value="title">タイトル</option>
+        <option value="oshi">推し名</option>
+        <option value="tag">タグ</option>
+      </select>
+      <input
+        type="text"
+        placeholder="検索キーワード..."
+        class="h-10 flex-1 bg-blue-950 border border-indigo-600 rounded-md px-4 text-blue-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      />
+      <button
+        class="h-10 w-10 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md transition-colors flex items-center justify-center shrink-0"
+      >
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+      </button>
+    </div>
+
+    <div *ngIf="isEditMode" class="flex-1 flex gap-3 items-center">
+      <span
+        class="h-10 flex items-center text-sm font-bold text-indigo-300 whitespace-nowrap"
+        >タグ一括付与:</span
+      >
+      <input
+        type="text"
+        placeholder="つけたいタグ名をカンマ(,)区切りで入力..."
+        class="h-10 flex-1 bg-blue-950 border border-red-600/50 rounded-md px-4 text-blue-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+      />
+      <button
+        class="h-10 w-10 bg-red-600 hover:bg-red-500 text-white rounded-md transition-colors flex items-center justify-center shrink-0"
+        title="選択した動画にタグを付与"
+      >
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
+    <a
+      *ngFor="let video of videos"
+      [href]="video.url"
+      target="_blank"
+      class="block bg-blue-950 border rounded-xl overflow-hidden hover:shadow-[0_0_15px_rgba(99,102,241,0.2)] transition-all relative group cursor-pointer"
+      [ngClass]="
+        video.isSelected
+          ? 'border-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.3)]'
+          : 'border-indigo-800 hover:border-indigo-400'
+      "
+      (click)="onVideoClick($event, video)"
+    >
+      <div
+        *ngIf="isEditMode && video.isSelected"
+        class="absolute inset-0 bg-indigo-500/30 border-4 border-indigo-500 z-10 flex items-start justify-end p-2 pointer-events-none"
+      >
+        <div class="bg-indigo-500 rounded-full p-1 text-white shadow-lg">
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="3"
+              d="M5 13l4 4L19 7"
+            ></path>
+          </svg>
+        </div>
+      </div>
+
+      <div
+        class="aspect-video bg-indigo-900/50 flex items-center justify-center relative overflow-hidden"
+      >
+        <img
+          *ngIf="video.thumbnailUrl"
+          [src]="video.thumbnailUrl"
+          class="object-cover w-full h-full"
+          alt="thumbnail"
+        />
+        <span *ngIf="!video.thumbnailUrl" class="text-indigo-400 text-sm"
+          >NO IMAGE</span
+        >
+
+        <div
+          class="absolute bottom-2 right-2 bg-black/70 px-2 py-0.5 rounded text-xs text-white"
+        >
+          {{ video.duration }}
+        </div>
+      </div>
+
+      <div class="p-4">
+        <h3
+          class="font-bold text-base line-clamp-2 mb-2 group-hover:text-indigo-300 transition-colors"
+        >
+          {{ video.title }}
+        </h3>
+        <div class="flex flex-wrap gap-1 mt-3 items-center">
+          <span
+            class="text-xs text-indigo-300 bg-indigo-900/50 px-2 py-1 rounded"
+            >{{ video.oshiName }}</span
+          >
+          <span
+            *ngFor="let tag of video.tags"
+            class="text-xs text-indigo-200 bg-blue-900 px-2 py-1 rounded"
+            >{{ tag }}</span
+          >
+
+          <span class="ml-auto text-xs text-indigo-400">{{
+            video.publishedAt
+          }}</span>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
