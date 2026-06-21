@@ -18,7 +18,7 @@ export class BatchController {
     // 2. 合言葉が合っていればバッチ処理を実行
     try {
       console.log("バッチ処理を開始します...");
-      await batchService.syncYouTubeVideos("full");
+      await batchService.syncYouTubeVideos();
 
       res.json({ success: true, message: "YouTube同期バッチが完了しました" });
     } catch (error) {
