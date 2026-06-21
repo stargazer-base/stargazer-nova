@@ -3,10 +3,14 @@ import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // YouTubeの特殊な時間形式(PT10M30S)を「10:30」や「1:05:00」に変換する関数
 function formatYouTubeDuration(duration: string): string {
