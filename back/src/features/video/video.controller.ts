@@ -10,7 +10,15 @@ export class VideoController {
       const type = (req.query.type as string) || "title";
       const keyword = (req.query.keyword as string) || "";
 
-      const videos = await videoService.searchVideos(type, keyword);
+      const page = parseInt(req.query.page as string, 10) || 1;
+      const limit = parseInt(req.query.limit as string, 10) || 40;
+
+      const videos = await videoService.searchVideos(
+        type,
+        keyword,
+        page,
+        limit,
+      );
       res.json(videos);
     } catch (error) {
       res.status(500).json({ error: "動画の取得に失敗しました" });

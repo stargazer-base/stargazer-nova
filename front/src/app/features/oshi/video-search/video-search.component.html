@@ -179,7 +179,7 @@
       <div class="p-4">
         <h3
           class="font-bold text-base line-clamp-2 mb-2 group-hover:text-indigo-300 transition-colors"
-          [title]="video.title"
+          [title]="video.oshiName + ' - ' + video.title"
         >
           {{ video.title }}
         </h3>
@@ -195,21 +195,29 @@
   </div>
 
   <!-- ページネーション -->
-  <div class="pagination-controls" *ngIf="totalPages > 1">
+  <div
+    class="flex justify-center items-center gap-4 mt-8 mb-8"
+    *ngIf="totalPages > 1"
+  >
     <button
       (click)="changePage(currentPage - 1)"
       [disabled]="currentPage === 1"
+      class="px-4 py-2 bg-indigo-800 text-indigo-200 rounded-md font-semibold hover:bg-indigo-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
     >
-      前のページ
+      ＜
     </button>
 
-    <span class="page-info">{{ currentPage }} / {{ totalPages }} ページ</span>
+    <span class="text-indigo-200 font-medium">
+      <span class="text-lg font-bold text-indigo-200">{{ currentPage }}</span> /
+      {{ totalPages }} ページ
+    </span>
 
     <button
       (click)="changePage(currentPage + 1)"
       [disabled]="currentPage === totalPages"
+      class="px-4 py-2 bg-indigo-800 text-indigo-200 rounded-md font-semibold hover:bg-indigo-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
     >
-      次のページ
+      ＞
     </button>
   </div>
 </div>
