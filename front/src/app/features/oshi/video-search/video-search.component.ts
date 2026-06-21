@@ -53,7 +53,7 @@ export class VideoSearchComponent implements OnInit {
     this.currentKeyword = keyword;
 
     // URLに page と limit を追加
-    const apiUrl = `http://localhost:3000/api/videos?type=${type}&keyword=${keyword}&page=${page}&limit=40`;
+    const apiUrl = `https://stargazer-nova.onrender.com/api/videos?type=${type}&keyword=${keyword}&page=${page}&limit=40`;
 
     // 受け取るデータが配列からオブジェクト（{ videos: [...], totalPages: ... }）に変わるので any で受ける
     this.http.get<any>(apiUrl).subscribe({
@@ -99,7 +99,7 @@ export class VideoSearchComponent implements OnInit {
     }
 
     // バックエンドAPIへPOSTリクエストを送信
-    const apiUrl = 'http://localhost:3000/api/videos/tags';
+    const apiUrl = 'https://stargazer-nova.onrender.com/api/videos/tags';
     const payload = {
       videoIds: Array.from(this.selectedVideoIds),
       tags: tagsToAdd,
