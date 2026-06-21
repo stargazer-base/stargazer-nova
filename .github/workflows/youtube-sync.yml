@@ -1,0 +1,20 @@
+name: Daily YouTube Sync Batch
+
+on:
+  # ① 定期実行のスケジュール設定
+  schedule:
+    # 日本時間の毎日午前 3:00 に実行（UTCで指定するためマイナス9時間して 18:00 に設定）
+    - cron: "0 18 * * *"
+
+  # ② 手動実行ボタンを有効化（GitHubの画面からいつでもポチッとテストできるようにする）
+  workflow_dispatch:
+
+jobs:
+  run-batch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Batch API
+        run: |
+          curl -X POST ${{ secrets.API_URL }}/api/batch/youtube-sync \
+          -H "Authorization: Bearer ${{ secrets.BATCH_SECRET_KEY }}" \
+          -H "Content-Type: application/json"
