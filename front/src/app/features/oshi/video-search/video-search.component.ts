@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
 export interface Video {
   id: string;
@@ -27,9 +28,14 @@ export class VideoSearchComponent implements OnInit {
   currentKeyword = ''; // ページ切り替え時に検索条件を維持するため
   selectedVideoIds = new Set<string>(); // 選択されたIDを記憶する箱
   newTagsInput: string = ''; // 入力されたタグを保持する変数
+  isModalOpen = false;
+  selectedVideoUrl: SafeResourceUrl | null = null;
 
   // HttpClientをコンストラクタで受け取る
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private sanitizer: DomSanitizer,
+  ) {}
 
   ngOnInit(): void {
     // 画面が開いた時にAPIからデータを取得する
@@ -133,7 +139,7 @@ export class VideoSearchComponent implements OnInit {
     }
   }
 
-  // 編集モードで動画押下時のメソッド
+  // 動画押下時のメソッド
   onVideoClick(event: Event, video: Video) {
     if (this.isEditMode) {
       event.preventDefault();
@@ -145,6 +151,46 @@ export class VideoSearchComponent implements OnInit {
       } else {
         this.selectedVideoIds.delete(video.id);
       }
+    } else {
+      // 編集モードでない場合は動画モーダルを開く
+      this.openVideoModal(video);
+    }
+  }
+
+  // 動画モーダルを開く処理
+  openVideoModal(video: Video) {
+    if (this.isModalOpen) return;
+
+    // URLから動画IDだけを抜き出す（例: https://youtube.com/watch?v=abcde -> abcde）
+    const videoId = video.url.split('v=')[1];
+
+    // 埋め込み用のURLを作成し、魔法のパラメータ「?autoplay=1」をつける！
+    const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&vq=hd1080`;
+
+    // Angularに「このURLは安全だよ」と教えてあげる
+    this.selectedVideoUrl =
+      this.sanitizer.bypassSecurityTrustResourceUrl(embedUrl);
+
+    // モーダルを表示する
+    this.isModalOpen = true;
+
+    // サムネイルをクリックした勢いで、ブラウザ全体をフルスクリーンにする！
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) {
+      elem.requestFullscreen().catch((err) => {
+        console.warn('フルスクリーンAPIがブロックされました:', err);
+      });
+    }
+  }
+
+  // 動画モーダルを閉じる処理
+  closeModal() {
+    this.isModalOpen = false;
+    this.selectedVideoUrl = null; // URLを消すことで裏での再生をピタッと止める
+
+    // モーダルを閉じたら、フルスクリーンも自動で解除する
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen();
     }
   }
 }
