@@ -46,13 +46,8 @@ export class BatchService {
       try {
         console.log(`▶ チャンネル[${channel.name}] の処理を開始...`);
 
-        // ① チャンネルの「アップロード済みプレイリストID」を取得
-        const channelRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${channel.id}&key=${apiKey}`,
-        );
-        const channelData = await channelRes.json();
-        const uploadsPlaylistId =
-          channelData.items[0]?.contentDetails?.relatedPlaylists?.uploads;
+        // 新しいJSON構成からプレイリストIDを直接取得（API呼び出しをスキップ！）
+        const uploadsPlaylistId = channel.playlistId;
 
         if (!uploadsPlaylistId) {
           console.warn(`プレイリストが見つかりませんでした: ${channel.name}`);
@@ -64,11 +59,12 @@ export class BatchService {
         let nextPageToken = "";
 
         if (mode === "delta") {
-          // 【差分更新】最新20件だけを1回の通信でサクッと取得
+          // 【差分更新】最新20件だけを1回の通信で取得
           const playlistRes = await fetch(
             `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=20&key=${apiKey}`,
           );
           const playlistData = await playlistRes.json();
+
           if (playlistData.items) {
             videoIds = playlistData.items.map(
               (item: any) => item.snippet.resourceId.videoId,
@@ -79,10 +75,6 @@ export class BatchService {
               playlistData,
             );
           }
-
-          videoIds = playlistData.items.map(
-            (item: any) => item.snippet.resourceId.videoId,
-          );
         } else {
           // 【初回全件】ページがなくなるまで全部めくるループ
           do {
@@ -107,44 +99,54 @@ export class BatchService {
             );
             videoIds.push(...ids);
 
-            nextPageToken = playlistData.nextPageToken; // 次のページがあれば継続
+            // undefinedの場合は空文字にして無限ループを防止
+            nextPageToken = playlistData.nextPageToken || "";
           } while (nextPageToken !== "");
         }
 
         console.log(`  取得した動画ID: ${videoIds.length} 件`);
 
-        // ③ 取得した動画IDを50件ずつの「塊（チャンク）」に分割
+        // 取得した動画が0件なら詳細取得とDB保存をスキップ
+        if (videoIds.length === 0) {
+          console.log(`  保存する動画がないためスキップします。`);
+          continue;
+        }
+
+        // 取得した動画IDを50件ずつの「塊（チャンク）」に分割
         const chunkSize = 50;
         for (let i = 0; i < videoIds.length; i += chunkSize) {
           const chunkIds = videoIds.slice(i, i + chunkSize);
           const idsString = chunkIds.join(",");
 
-          // ④ 詳細情報（再生時間など）を取得
+          // 詳細情報（再生時間など）を取得
           const videoRes = await fetch(
             `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${idsString}&key=${apiKey}`,
           );
           const videoData = await videoRes.json();
 
-          // ⑤ データベースに保存 (upsert: あれば更新、なければ作成)
+          if (!videoData.items) continue;
+
+          // データベースに保存 (upsert: あれば更新、なければ作成)
           for (const item of videoData.items) {
+            // YouTube APIにvideoUrlはないのでIDから自作する
+            const videoUrl = `https://www.youtube.com/watch?v=${item.id}`;
+
             await prisma.video.upsert({
-              where: { url: item.videoUrl },
+              where: { url: videoUrl },
               update: {
                 title: item.snippet.title,
-                thumbnailUrl: item.snippet.thumbnails.high.url,
-                duration: formatYouTubeDuration(item.contentDetails.duration), // 更新時にも反映
-                // ... その他更新したい項目
+                thumbnailUrl: item.snippet.thumbnails?.high?.url || "",
+                duration: formatYouTubeDuration(item.contentDetails?.duration),
               },
               create: {
                 id: item.id,
                 title: item.snippet.title,
-                url: item.videoUrl,
-                thumbnailUrl: item.snippet.thumbnails.high.url,
-                oshiName: channel.name,
-                tags: [channel.dispName],
-                duration: formatYouTubeDuration(item.contentDetails.duration),
+                url: videoUrl,
+                thumbnailUrl: item.snippet.thumbnails?.high?.url || "",
+                oshiName: channel.name, // JSONの name を使用
+                tags: [channel.dispName], // JSONの dispName を使用
+                duration: formatYouTubeDuration(item.contentDetails?.duration),
                 publishedAt: item.snippet.publishedAt,
-                // ... その他保存したい項目
               },
             });
           }
@@ -155,9 +157,8 @@ export class BatchService {
           `[エラー] チャンネル ${channel.name} の処理中に失敗しました:`,
           error,
         );
-        // エラーが起きても、次のチャンネルの処理へ進む（途中で止めない）
       } finally {
-        // APIのレート制限を考慮して、少し待機（例: 1秒）
+        // APIのレート制限を考慮して、少し待機（5秒）
         await new Promise((resolve) => setTimeout(resolve, 5000));
       }
     }
