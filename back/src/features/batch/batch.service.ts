@@ -31,7 +31,7 @@ function formatYouTubeDuration(duration: string): string {
 }
 
 export class BatchService {
-  async syncYouTubeVideos() {
+  async syncYouTubeVideos(mode: "full" | "delta" = "delta") {
     console.log("YouTube APIから最新動画を取得します...");
 
     const apiKey = process.env.YOUTUBE_API_KEY;
@@ -40,76 +40,127 @@ export class BatchService {
     const jsonPath = path.join(__dirname, "channels.json");
     const rawData = fs.readFileSync(jsonPath, "utf-8");
     const channels = JSON.parse(rawData);
-    console.log(`合計 ${channels.length} 件のチャンネルを処理します。`);
-    // チャンネルごとにループ処理を実行
+    console.log(`=== バッチ処理開始 (モード: ${mode}) ===`);
+
     for (const channel of channels) {
-      console.log(`\n▶ [${channel.name}] の動画を取得中...`);
-
       try {
-        // 【ステップ1】Search APIで最新動画の「ID」だけを取得する
-        const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channel.id}&maxResults=5&order=date&type=video&key=${apiKey}`;
-        const searchResponse = await fetch(searchUrl);
-        const searchData = await searchResponse.json();
+        console.log(`▶ チャンネル[${channel.name}] の処理を開始...`);
 
-        if (!searchData.items || searchData.items.length === 0) {
-          console.log("新しい動画は見つかりませんでした。");
+        // ① チャンネルの「アップロード済みプレイリストID」を取得
+        const channelRes = await fetch(
+          `https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${channel.id}&key=${apiKey}`,
+        );
+        const channelData = await channelRes.json();
+        const uploadsPlaylistId =
+          channelData.items[0]?.contentDetails?.relatedPlaylists?.uploads;
+
+        if (!uploadsPlaylistId) {
+          console.warn(`プレイリストが見つかりませんでした: ${channel.name}`);
           continue;
         }
 
-        // 取得した動画のIDをカンマ区切りでまとめる (例: "id1,id2,id3")
-        const videoIds = searchData.items
-          .map((item: any) => item.id.videoId)
-          .join(",");
+        // ② モードに応じて動画IDのリストを取得
+        let videoIds: string[] = [];
+        let nextPageToken = "";
 
-        // 【ステップ2】Videos APIで、まとめたIDの詳細情報（時間など）を一括取得する
-        const videosUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoIds}&key=${apiKey}`;
-        const videosResponse = await fetch(videosUrl);
-        const videosData = await videosResponse.json();
-
-        console.log(
-          `${videosData.items.length}件の動画データをDBに書き込みます...`,
-        );
-
-        // 【ステップ3】詳細データを使ってDBに保存（Upsert）
-        for (const item of videosData.items) {
-          const videoId = item.id;
-          const videoUrl = `https://youtube.com/watch?v=${videoId}`;
-          const snippet = item.snippet;
-          const contentDetails = item.contentDetails;
-
-          // 時間をきれいにする
-          const formattedDuration = formatYouTubeDuration(
-            contentDetails?.duration,
+        if (mode === "delta") {
+          // 【差分更新】最新20件だけを1回の通信でサクッと取得
+          const playlistRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=20&key=${apiKey}`,
           );
+          const playlistData = await playlistRes.json();
+          if (playlistData.items) {
+            videoIds = playlistData.items.map(
+              (item: any) => item.snippet.resourceId.videoId,
+            );
+          } else {
+            console.warn(
+              `[警告] 動画データがありません（APIエラーの可能性）:`,
+              playlistData,
+            );
+          }
 
-          await prisma.video.upsert({
-            where: { url: videoUrl },
-            update: {
-              title: snippet.title,
-              thumbnailUrl: snippet.thumbnails.high.url,
-              duration: formattedDuration, // 更新時にも反映
-            },
-            create: {
-              title: snippet.title,
-              url: videoUrl,
-              thumbnailUrl: snippet.thumbnails.high.url,
-              oshiName: channel.name,
-              tags: [],
-              duration: formattedDuration,
-              publishedAt: snippet.publishedAt,
-            },
-          });
+          videoIds = playlistData.items.map(
+            (item: any) => item.snippet.resourceId.videoId,
+          );
+        } else {
+          // 【初回全件】ページがなくなるまで全部めくるループ
+          do {
+            const pageParam = nextPageToken
+              ? `&pageToken=${nextPageToken}`
+              : "";
+            const playlistRes = await fetch(
+              `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=50&key=${apiKey}${pageParam}`,
+            );
+            const playlistData = await playlistRes.json();
+
+            if (!playlistData.items) {
+              console.warn(
+                `[警告] ページ取得中にデータが途切れました。APIエラー内容:`,
+                playlistData,
+              );
+              break;
+            }
+
+            const ids = playlistData.items.map(
+              (item: any) => item.snippet.resourceId.videoId,
+            );
+            videoIds.push(...ids);
+
+            nextPageToken = playlistData.nextPageToken; // 次のページがあれば継続
+          } while (nextPageToken !== "");
         }
 
-        console.log(`  └ ${videosData.items.length} 件の動画を処理しました。`);
+        console.log(`  取得した動画ID: ${videoIds.length} 件`);
+
+        // ③ 取得した動画IDを50件ずつの「塊（チャンク）」に分割
+        const chunkSize = 50;
+        for (let i = 0; i < videoIds.length; i += chunkSize) {
+          const chunkIds = videoIds.slice(i, i + chunkSize);
+          const idsString = chunkIds.join(",");
+
+          // ④ 詳細情報（再生時間など）を取得
+          const videoRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${idsString}&key=${apiKey}`,
+          );
+          const videoData = await videoRes.json();
+
+          // ⑤ データベースに保存 (upsert: あれば更新、なければ作成)
+          for (const item of videoData.items) {
+            await prisma.video.upsert({
+              where: { url: item.videoUrl },
+              update: {
+                title: item.snippet.title,
+                thumbnailUrl: item.snippet.thumbnails.high.url,
+                duration: formatYouTubeDuration(item.contentDetails.duration), // 更新時にも反映
+                // ... その他更新したい項目
+              },
+              create: {
+                id: item.id,
+                title: item.snippet.title,
+                url: item.videoUrl,
+                thumbnailUrl: item.snippet.thumbnails.high.url,
+                oshiName: channel.name,
+                tags: [channel.dispName],
+                duration: formatYouTubeDuration(item.contentDetails.duration),
+                publishedAt: item.snippet.publishedAt,
+                // ... その他保存したい項目
+              },
+            });
+          }
+        }
+        console.log(`  チャンネル[${channel.name}] の処理完了！`);
       } catch (error) {
-        // ★重要：特定のチャンネルでエラーが起きても、システムを落とさずにエラーログだけ残して次のチャンネルへ進む
         console.error(
-          `  └ [エラー] ${channel.name} の処理中に問題が発生しました:`,
+          `[エラー] チャンネル ${channel.name} の処理中に失敗しました:`,
           error,
         );
-        throw error;
+        // エラーが起きても、次のチャンネルの処理へ進む（途中で止めない）
+      } finally {
+        // APIのレート制限を考慮して、少し待機（例: 1秒）
+        await new Promise((resolve) => setTimeout(resolve, 5000));
       }
     }
+    console.log(`=== バッチ処理完了 ===`);
   }
 }
