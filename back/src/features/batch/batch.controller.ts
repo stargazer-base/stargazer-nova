@@ -1,5 +1,5 @@
-import { Request, Response } from "express";
-import { BatchService } from "./batch.service";
+import type { Request, Response } from "express";
+import { BatchService } from "./batch.service.js";
 
 const batchService = new BatchService();
 

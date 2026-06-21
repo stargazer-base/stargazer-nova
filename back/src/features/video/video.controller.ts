@@ -1,5 +1,5 @@
-import { Request, Response } from "express";
-import { VideoService } from "./video.service";
+import type { Request, Response } from "express";
+import { VideoService } from "./video.service.js";
 
 const videoService = new VideoService();
 

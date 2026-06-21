@@ -2,8 +2,8 @@ import "dotenv/config";
 
 import express from "express";
 import cors from "cors";
-import videoRoutes from "./features/video/video.routes"; // 追加
-import batchRoutes from "./features/batch/batch.routes";
+import videoRoutes from "./features/video/video.routes.js";
+import batchRoutes from "./features/batch/batch.routes.js";
 
 const app = express();
 app.set("json spaces", 2);

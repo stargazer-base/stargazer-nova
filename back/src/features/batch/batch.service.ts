@@ -15,9 +15,9 @@ function formatYouTubeDuration(duration: string): string {
   const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
   if (!match) return "00:00";
 
-  const h = parseInt(match[1]) || 0;
-  const m = parseInt(match[2]) || 0;
-  const s = parseInt(match[3]) || 0;
+  const h = parseInt(match[1] ?? "0");
+  const m = parseInt(match[2] ?? "0");
+  const s = parseInt(match[3] ?? "0");
 
   // 1時間以上ある場合は「H:MM:SS」、それ以外は「MM:SS」
   if (h > 0) {
