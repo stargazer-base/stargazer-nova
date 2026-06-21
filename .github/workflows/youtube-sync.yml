@@ -15,6 +15,6 @@ jobs:
     steps:
       - name: Call Batch API
         run: |
-          curl -X POST https://stargazer-base.onrender.com/api/batch/youtube-sync
+          curl -X POST https://stargazer-base.onrender.com/api/batch/youtube-sync \
           -H "Authorization: Bearer ${{ secrets.BATCH_SECRET_KEY }}" \
           -H "Content-Type: application/json"
