@@ -159,6 +159,7 @@
         <div
           class="absolute bottom-2 right-2 bg-black/70 px-2 py-0.5 rounded text-xs text-white"
         >
+          {{ video.publishedAt | date: "yyyy/MM/dd HH:mm" }} -
           {{ video.duration }}
         </div>
       </div>
@@ -166,25 +167,37 @@
       <div class="p-4">
         <h3
           class="font-bold text-base line-clamp-2 mb-2 group-hover:text-indigo-300 transition-colors"
+          [title]="video.title"
         >
           {{ video.title }}
         </h3>
         <div class="flex flex-wrap gap-1 mt-3 items-center">
           <span
-            class="text-xs text-indigo-300 bg-indigo-900/50 px-2 py-1 rounded"
-            >{{ video.oshiName }}</span
-          >
-          <span
             *ngFor="let tag of video.tags"
-            class="text-xs text-indigo-200 bg-blue-900 px-2 py-1 rounded"
+            class="text-xs text-indigo-200 bg-indigo-900 px-2 py-1 rounded"
             >{{ tag }}</span
           >
-
-          <span class="ml-auto text-xs text-indigo-400">{{
-            video.publishedAt
-          }}</span>
         </div>
       </div>
     </a>
+  </div>
+
+  <!-- ページネーション -->
+  <div class="pagination-controls" *ngIf="totalPages > 1">
+    <button
+      (click)="changePage(currentPage - 1)"
+      [disabled]="currentPage === 1"
+    >
+      前のページ
+    </button>
+
+    <span class="page-info">{{ currentPage }} / {{ totalPages }} ページ</span>
+
+    <button
+      (click)="changePage(currentPage + 1)"
+      [disabled]="currentPage === totalPages"
+    >
+      次のページ
+    </button>
   </div>
 </div>

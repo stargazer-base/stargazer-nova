@@ -13,31 +13,36 @@ export class VideoService {
   // ==========================================
   // 動画検索ロジック
   // ==========================================
-  async searchVideos(type: string, keyword: string) {
-    // 検索条件（WHERE句）を組み立てるオブジェクト
+  async searchVideos(
+    type: string,
+    keyword: string,
+    page: number = 1,
+    limit: number = 40,
+  ) {
     const whereClause: any = {};
-
     if (keyword) {
-      if (type === "title") {
-        // タイトルは「部分一致（contains）」で検索
-        whereClause.title = { contains: keyword };
-      } else if (type === "oshi") {
-        // 推し名も「部分一致」で検索
-        whereClause.oshiName = { contains: keyword };
-      } else if (type === "tag") {
-        // ★PostgreSQL配列型の特権！「配列の中にキーワードが含まれているか（has）」で検索
-        whereClause.tags = { has: keyword };
-      }
+      if (type === "title") whereClause.title = { contains: keyword };
+      else if (type === "oshi") whereClause.oshiName = { contains: keyword };
+      else if (type === "tag") whereClause.tags = { has: keyword };
     }
 
-    // Prismaを使ってDBから取得
-    const videos = await prisma.video.findMany({
-      where: whereClause,
-      // 登録順（または新しい順）など並び替えも簡単に指定できます
-      orderBy: { publishedAt: "desc" },
-    });
+    // 件数カウントとデータ取得を同時に（並列で）行います
+    const [totalCount, videos] = await prisma.$transaction([
+      prisma.video.count({ where: whereClause }),
+      prisma.video.findMany({
+        where: whereClause,
+        orderBy: { publishedAt: "desc" },
+        skip: (page - 1) * limit, // 例: 2ページ目なら、(2-1)*40 = 最初の40件をスキップ
+        take: limit, // 40件だけ取得
+      }),
+    ]);
 
-    return videos;
+    return {
+      videos,
+      totalCount,
+      totalPages: Math.ceil(totalCount / limit), // 全ページ数を計算
+      currentPage: page,
+    };
   }
 
   // ==========================================
