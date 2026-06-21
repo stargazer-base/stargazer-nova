@@ -68,6 +68,7 @@
     <div *ngIf="!isEditMode" class="flex-1 flex gap-3 items-center">
       <select
         class="h-10 bg-blue-950 border border-indigo-600 rounded-md px-3 text-blue-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        [(ngModel)]="currentType"
       >
         <option value="title">タイトル</option>
         <option value="oshi">推し名</option>
@@ -75,11 +76,13 @@
       </select>
       <input
         type="text"
-        placeholder="検索キーワード..."
+        placeholder="検索キーワードを入力..."
         class="h-10 flex-1 bg-blue-950 border border-indigo-600 rounded-md px-4 text-blue-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        [(ngModel)]="currentKeyword"
       />
       <button
         class="h-10 w-10 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md transition-colors flex items-center justify-center shrink-0"
+        (click)="onSearchSubmit()"
       >
         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
           <path d="M8 5v14l11-7z" />
@@ -96,10 +99,12 @@
         type="text"
         placeholder="つけたいタグ名をカンマ(,)区切りで入力..."
         class="h-10 flex-1 bg-blue-950 border border-red-600/50 rounded-md px-4 text-blue-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+        [(ngModel)]="newTagsInput"
       />
       <button
         class="h-10 w-10 bg-red-600 hover:bg-red-500 text-white rounded-md transition-colors flex items-center justify-center shrink-0"
         title="選択した動画にタグを付与"
+        (click)="applyTags()"
       >
         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
           <path d="M8 5v14l11-7z" />
@@ -109,6 +114,13 @@
   </div>
 
   <!-- 動画リスト -->
+  <div class="text-center py-10" *ngIf="videos.length === 0">
+    <h3>
+      <span class="opacity-80">🔍</span>該当する動画が見つかりませんでした
+    </h3>
+    <p>別のキーワードや条件で再度検索してみてください</p>
+  </div>
+
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-2">
     <a
       *ngFor="let video of videos"

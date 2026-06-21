@@ -11,6 +11,7 @@ import { TodoComponent } from './features/life/todo/todo.component';
 import { BudgetBookComponent } from './features/life/budget-book/budget-book.component';
 import { AppIdeaComponent } from './features/life/app-idea/app-idea.component';
 import { HttpClientModule } from '@angular/common/http';
+import { FormsModule } from '@angular/forms';
 
 @NgModule({
   declarations: [
@@ -23,7 +24,7 @@ import { HttpClientModule } from '@angular/common/http';
     BudgetBookComponent,
     AppIdeaComponent,
   ],
-  imports: [BrowserModule, AppRoutingModule, HttpClientModule],
+  imports: [BrowserModule, AppRoutingModule, HttpClientModule, FormsModule],
   providers: [],
   bootstrap: [AppComponent],
 })

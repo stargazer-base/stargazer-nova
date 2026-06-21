@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { HttpClient } from '@angular/common/http'; // ★追加
+import { HttpClient } from '@angular/common/http';
 
 export interface Video {
   id: string;
@@ -25,7 +25,8 @@ export class VideoSearchComponent implements OnInit {
   totalPages = 1;
   currentType = 'title'; // ページ切り替え時に検索条件を維持するため
   currentKeyword = ''; // ページ切り替え時に検索条件を維持するため
-  selectedVideoIds = new Set<string>(); //選択されたIDを記憶する箱を用意
+  selectedVideoIds = new Set<string>(); // 選択されたIDを記憶する箱
+  newTagsInput: string = ''; // 入力されたタグを保持する変数
 
   // HttpClientをコンストラクタで受け取る
   constructor(private http: HttpClient) {}
@@ -63,6 +64,57 @@ export class VideoSearchComponent implements OnInit {
     });
   }
 
+  // 検索モードで実行ボタン押下時のメソッド
+  onSearchSubmit() {
+    // 必ず1ページ目から検索し直す
+    this.searchVideos(this.currentType, this.currentKeyword, 1);
+  }
+
+  // タグ一括付与を実行するメソッド
+  applyTags() {
+    // エラーチェック（バリデーション）
+    if (this.selectedVideoIds.size === 0) {
+      alert('動画が選択されていません。');
+      return;
+    }
+    if (!this.newTagsInput.trim()) {
+      alert('追加するタグを入力してください。');
+      return;
+    }
+
+    // 入力された文字列を配列に変換（全角/半角スペースや、カンマ・読点で分割）
+    const tagsToAdd = this.newTagsInput
+      .split(/[,\s、]+/)
+      .filter((tag) => tag.trim() !== '');
+
+    if (tagsToAdd.length === 0) {
+      alert('追加するタグを入力してください。');
+      return;
+    }
+
+    // バックエンドAPIへPOSTリクエストを送信
+    const apiUrl = 'http://localhost:3000/api/videos/tags';
+    const payload = {
+      videoIds: Array.from(this.selectedVideoIds),
+      tags: tagsToAdd,
+    };
+
+    this.http.post(apiUrl, payload).subscribe({
+      next: (response: any) => {
+        // 成功時の処理
+        alert(`${this.selectedVideoIds.size}件の動画にタグを追加しました！`);
+        this.newTagsInput = ''; // 入力欄をリセット
+
+        this.toggleMode('search'); // 編集モードを終了して通常モードに戻す
+        this.searchVideos(); // 画面を最新のDBの状態に更新（タグが反映される）
+      },
+      error: (err) => {
+        console.error('タグの更新に失敗しました', err);
+        alert('エラーが発生しました。通信状態を確認してください。');
+      },
+    });
+  }
+
   // ページ切り替えメソッド
   changePage(newPage: number) {
     if (newPage >= 1 && newPage <= this.totalPages) {
@@ -72,6 +124,7 @@ export class VideoSearchComponent implements OnInit {
     }
   }
 
+  // モード変更メソッド
   toggleMode(mode: 'search' | 'edit') {
     this.isEditMode = mode === 'edit';
     if (!this.isEditMode) {
@@ -80,6 +133,7 @@ export class VideoSearchComponent implements OnInit {
     }
   }
 
+  // 編集モードで動画押下時のメソッド
   onVideoClick(event: Event, video: Video) {
     if (this.isEditMode) {
       event.preventDefault();
