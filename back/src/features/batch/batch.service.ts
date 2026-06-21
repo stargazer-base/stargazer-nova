@@ -1,31 +1,94 @@
 import { PrismaClient } from "@prisma/client";
-// ... PrismaClientの初期化 ...
+import { Pool } from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
+
+// YouTubeの特殊な時間形式(PT10M30S)を「10:30」や「1:05:00」に変換する関数
+function formatYouTubeDuration(duration: string): string {
+  const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+  if (!match) return "00:00";
+
+  const h = parseInt(match[1]) || 0;
+  const m = parseInt(match[2]) || 0;
+  const s = parseInt(match[3]) || 0;
+
+  // 1時間以上ある場合は「H:MM:SS」、それ以外は「MM:SS」
+  if (h > 0) {
+    return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  }
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
 
 export class BatchService {
   async syncYouTubeVideos() {
-    // 1. YouTube APIを叩いて最新動画リストを取得（fetchなどを使用）
-    const youtubeData = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?key=YOUR_API_KEY&...`,
-    );
-    const videos = await youtubeData.json();
+    console.log("YouTube APIから最新動画を取得します...");
 
-    // 2. Prismaの upsert を使ってDBを安全に更新
-    for (const item of videos.items) {
-      await prisma.video.upsert({
-        where: { url: `https://youtube.com/watch?v=${item.id.videoId}` }, // URLで一意に判定
-        update: {
-          // 既に存在する場合の更新内容（再生回数などを更新したい場合はここに書く）
-        },
-        create: {
-          title: item.snippet.title,
-          url: `https://youtube.com/watch?v=${item.id.videoId}`,
-          thumbnailUrl: item.snippet.thumbnails.high.url,
-          oshiName: "取得先チャンネルの設定等に依存",
-          tags: [],
-          duration: "APIから取得した時間",
-          publishedAt: item.snippet.publishedAt,
-        },
-      });
+    const apiKey = process.env.YOUTUBE_API_KEY;
+    const targetChannelId = "UCBqcE4DnIXC-1HecBl5WTbQ"; // ※対象のチャンネルID
+
+    try {
+      // 【ステップ1】Search APIで最新動画の「ID」だけを取得する
+      const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${targetChannelId}&maxResults=5&order=date&type=video&key=${apiKey}`;
+      const searchResponse = await fetch(searchUrl);
+      const searchData = await searchResponse.json();
+
+      if (!searchData.items || searchData.items.length === 0) {
+        console.log("新しい動画は見つかりませんでした。");
+        return;
+      }
+
+      // 取得した動画のIDをカンマ区切りでまとめる (例: "id1,id2,id3")
+      const videoIds = searchData.items
+        .map((item: any) => item.id.videoId)
+        .join(",");
+
+      // 【ステップ2】Videos APIで、まとめたIDの詳細情報（時間など）を一括取得する
+      const videosUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoIds}&key=${apiKey}`;
+      const videosResponse = await fetch(videosUrl);
+      const videosData = await videosResponse.json();
+
+      console.log(
+        `${videosData.items.length}件の動画データをDBに書き込みます...`,
+      );
+
+      // 【ステップ3】詳細データを使ってDBに保存（Upsert）
+      for (const item of videosData.items) {
+        const videoId = item.id;
+        const videoUrl = `https://youtube.com/watch?v=${videoId}`;
+        const snippet = item.snippet;
+        const contentDetails = item.contentDetails;
+
+        // さっき作った関数で時間をきれいにする
+        const formattedDuration = formatYouTubeDuration(
+          contentDetails.duration,
+        );
+
+        await prisma.video.upsert({
+          where: { url: videoUrl },
+          update: {
+            title: snippet.title,
+            thumbnailUrl: snippet.thumbnails.high.url,
+            duration: formattedDuration, // 更新時にも反映
+          },
+          create: {
+            title: snippet.title,
+            url: videoUrl,
+            thumbnailUrl: snippet.thumbnails.high.url,
+            oshiName: snippet.channelTitle,
+            tags: [],
+            duration: formattedDuration, // きれいになった時間を保存！
+            publishedAt: snippet.publishedAt,
+          },
+        });
+      }
+
+      console.log("YouTube同期バッチが正常に完了しました！");
+    } catch (error) {
+      console.error("YouTube APIの通信中にエラーが発生しました:", error);
+      throw error;
     }
   }
 }
